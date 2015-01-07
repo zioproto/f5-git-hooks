@@ -1,0 +1,47 @@
+#!/usr/bin/env python
+import bigsuds
+import os
+import sys
+
+b = bigsuds.BIGIP(hostname="192.168.1.1", debug=True, username="username", password="pass")
+b.System.Session.set_active_folder("/Common")
+
+#allrulesnodevice = b.LocalLB.Rule.query_all_rules()
+irules_list = b.LocalLB.Rule.get_list()
+
+#This will produce a list of files:
+#git diff --cached --name-only
+
+rulediff = []
+newrules = []
+deleterules = []
+
+f = os.popen('git diff --cached --name-only')
+for filename in f.read().splitlines():
+
+	#check if new rule
+	if "/Common/"+filename in irules_list:
+		try:
+			f = open(filename,'r')
+			rulediff.append({'rule_name':filename, 'rule_definition': f.read()})
+			f.close()
+		except IOError:
+			deleterules.append("/Common/"+filename)
+			
+	else:
+		f = open(filename,'r')
+		newrules.append({'rule_name':filename, 'rule_definition': f.read()})
+		f.close()
+
+if not (rulediff or newrules or deleterules):
+	print "There is nothing to commit \n"
+	exit(-1)
+
+#print rulediff
+if (rulediff):
+	b.LocalLB.Rule.modify_rule(rulediff)
+if (newrules):
+	b.LocalLB.Rule.create(newrules)
+if (deleterules):
+	b.LocalLB.Rule.delete_rule(deleterules)
+

@@ -1,0 +1,12 @@
+
+ = System architecture =
+
+This is a pre-commit script, before committing the changes are pushed to the BIG-IP
+
+|DevPC|  <--- iControl SOAP API ---> |BIG-IP LTM|
+
+This script is simpler but I would suggest it only
+if you work alone, and changes are pushed to the devices only
+from your computer
+
+
