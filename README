@@ -1,0 +1,37 @@
+This is a collection of Git Hooks to version control the F5 iRules and
+Datagroups with git, and update the F5 device as soon the new version is pushed
+to a git repository
+
+ = Dependencies =
+
+You need to install the bigsuds python library from DevCentral F5 Website
+
+ = System architecture =
+
+This is the architecture: You have 3 hosts:
+
+|DevPC| <--- git+ssh ---> |GitBareRepository| <--- iControl SOAP API ---> |BIG-IP LTM|
+
+You work on your PC and you make changes to the iRules
+When you push your commits to the GitBareRepository the pre-receive hook is triggered,
+and the changes are pushed to the BIGIP devices.
+
+ = Limitations =
+
+This code assumes the following
+
+A git repository manages files only for 1 partition
+A git repository manages either irules or datagroups
+All files are in the main folder without subfolders.
+
+Of course you can modify the scripts to avoid these limitations, pull requests
+are welcome.
+
+ = Getting started =
+
+You probably have some irules already running on your BIGIP,
+you can backup them to files using the backup-tool.  Once you have the files
+you can create a new git repository and commit the first version of your irules
+files.
+
+

@@ -1,0 +1,69 @@
+#!/usr/bin/env python
+import bigsuds
+import os
+import sys
+import subprocess
+
+#CONFIG
+myhostname = "192.168.1.1"
+myusername = "myusername"
+mypassword = "mypassword"
+partition = "/Common"
+
+def git(args, **kwargs):
+    environ = os.environ.copy()
+    if 'repo' in kwargs:
+        environ['GIT_DIR'] = kwargs['repo']
+    if 'work' in kwargs:
+        environ['GIT_WORK_TREE'] = kwargs['work']
+    proc = subprocess.Popen(args, stdout=subprocess.PIPE, env=environ)
+    return proc.communicate()
+
+def get_changed_files(base, commit, **kw):
+    (results, code) = git(('git', 'diff', '--numstat', '--name-only', "%s..%s" % (base, commit)), **kw)
+    return results.strip().split('\n')
+
+def get_file_content(filename, commit):
+    (results, code) = git(('git', 'show', '%s:%s' % (commit, filename)))
+    return results
+
+b = bigsuds.BIGIP(hostname=myhostname, debug=True, username=myusername, password=mypassword)
+b.System.Session.set_active_folder(partition)
+
+#allrulesnodevice = b.LocalLB.Rule.query_all_rules()
+irules_list = b.LocalLB.Rule.get_list()
+
+rulediff = []
+newrules = []
+deleterules = []
+
+repo = os.getcwd()
+basedir = os.path.join(repo, "..")
+
+line = sys.stdin.read()
+(base, commit, ref) = line.strip().split()
+modified = get_changed_files(base, commit)
+for filename in modified:
+	#check if new rule
+	if partition+"/"+filename in irules_list:
+		ruledef = get_file_content(filename,commit)
+		if ruledef:
+			rulediff.append({'rule_name':filename, 'rule_definition': ruledef})
+		else:
+			deleterules.append(filename)
+	else:	
+		newrules.append({'rule_name':filename, 'rule_definition': get_file_content(filename,commit)})
+
+if not (rulediff or newrules or deleterules):
+	print "There is nothing to commit \n"
+	exit(-1)
+
+if (rulediff):
+	b.LocalLB.Rule.modify_rule(rulediff)
+if (newrules):
+	b.LocalLB.Rule.create(newrules)
+if (deleterules):
+	b.LocalLB.Rule.delete_rule(deleterules)
+
+b.System.ConfigSync.synchronize_to_group("sync-failover")
+

@@ -1,0 +1,120 @@
+#!/usr/bin/env python
+import bigsuds
+import os
+import sys
+import subprocess
+import base64
+
+#CONFIG
+myhostname = "192.168.1.1"
+myusername = "myusername"
+mypassword = "mypassword"
+partition = "/Common"
+
+
+def uploadfile(bigip,dgdict):
+
+    DF_CHUNK_SIZE = 65000
+#    done = False
+#    first = True
+    text = base64.b64encode(dgdict['dg_definition'])
+    if len(text) > DF_CHUNK_SIZE:
+        print "File is too big and chunk split is not yet implemented\n"
+	exit(-1)
+    else:
+	print "/tmp/"+dgdict['dg_name']
+        bigip.System.ConfigSync.upload_file(file_name="/tmp/"+dgdict['dg_name'],file_context=dict(file_data=text,chain_type='FILE_FIRST_AND_LAST'))
+
+### Use this snippet of code in future to implement upload splitted in more chunks
+#    while not done:
+#        text = base64.b64encode(fileobj.read(DF_CHUNK_SIZE))
+#
+#        if first:
+#            if len(text) < DF_CHUNK_SIZE:
+#                chain_type = 'FILE_FIRST_AND_LAST'
+#            else:
+#                chain_type = 'FILE_FIRST'
+#            first = False
+#        else:
+#            if len(text) < DF_CHUNK_SIZE:
+#                chain_type = 'FILE_LAST'
+#                done = True
+#            else:
+#                chain_type = 'FILE_MIDDLE'
+#
+#       
+#        bigip.System.ConfigSync.upload_file(file_name="/tmp/"+filename,file_context=dict(file_data=text,chain_type=chain_type))
+
+def git(args, **kwargs):
+    environ = os.environ.copy()
+    if 'repo' in kwargs:
+        environ['GIT_DIR'] = kwargs['repo']
+    if 'work' in kwargs:
+        environ['GIT_WORK_TREE'] = kwargs['work']
+    proc = subprocess.Popen(args, stdout=subprocess.PIPE, env=environ)
+    return proc.communicate()
+
+def get_changed_files(base, commit, **kw):
+    (results, code) = git(('git', 'diff', '--numstat', '--name-only', "%s..%s" % (base, commit)), **kw)
+    return results.strip().split('\n')
+
+def get_file_content(filename, commit):
+    (results, code) = git(('git', 'show', '%s:%s' % (commit, filename)))
+    return results
+
+b = bigsuds.BIGIP(hostname=myhostname, debug=True, username=myusername, password=mypassword)
+b.System.Session.set_active_folder(partition)
+
+dgfilelist = b.LocalLB.DataGroupFile.get_list()
+
+changedfiles = []
+newfiles = []
+deletedfiles = []
+
+repo = os.getcwd()
+basedir = os.path.join(repo, "..")
+
+line = sys.stdin.read()
+(base, commit, ref) = line.strip().split()
+modified = get_changed_files(base, commit)
+
+#This is a workaround for your first push
+#At first push there will be no diff
+#BIGIP device will be updated after the second push
+if  modified == ['']:
+	exit(0)
+
+for filename in modified:
+	#check if new rule
+	if partition+"/"+filename in dgfilelist:
+		ruledef = get_file_content(filename,commit)
+		if ruledef:
+			changedfiles.append({'dg_name':filename, 'dg_definition': ruledef})
+		else:
+			deletedfiles.append(filename)
+	else:	
+		newfiles.append({'dg_name':filename, 'dg_definition': get_file_content(filename,commit)})
+
+if not (changedfiles or newfiles or deletedfiles):
+	print "There is nothing to commit \n"
+	exit(-1)
+
+if (changedfiles):
+	for c in changedfiles:
+		uploadfile(b,c)
+		b.LocalLB.DataGroupFile.set_local_path([c['dg_name']],["/tmp/"+c['dg_name']])
+
+if (newfiles):
+	for c in newfiles:
+		uploadfile(b,c)
+		b.LocalLB.DataGroupFile.create([c['dg_name']],["/tmp/"+c['dg_name']],['DATA_GROUP_STRING'])
+		b.LocalLB.Class.create_external_class_v2([c['dg_name']],[c['dg_name']])
+
+if (deletedfiles):
+	for c in deletedfiles:
+		b.LocalLB.Class.delete_class([c])
+		b.LocalLB.DataGroupFile.delete_data_group_file([c])
+
+
+b.System.ConfigSync.synchronize_to_group("sync-failover")
+
