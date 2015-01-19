@@ -9,6 +9,7 @@ myhostname = "192.168.1.1"
 myusername = "myusername"
 mypassword = "mypassword"
 partition = "/Common"
+gbranch = "nameofbranch" #git branch that will be pushed here to update the device
 
 def git(args, **kwargs):
     environ = os.environ.copy()
@@ -42,6 +43,9 @@ basedir = os.path.join(repo, "..")
 
 line = sys.stdin.read()
 (base, commit, ref) = line.strip().split()
+if ref != 'refs/heads/'+gbranch:
+	print "You are allowed to push only to %s" % gbranch
+	exit(-1)
 modified = get_changed_files(base, commit)
 for filename in modified:
 	#check if new rule
