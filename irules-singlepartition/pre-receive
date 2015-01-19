@@ -42,7 +42,11 @@ repo = os.getcwd()
 basedir = os.path.join(repo, "..")
 
 line = sys.stdin.read()
-(base, commit, ref) = line.strip().split()
+try:
+	(base, commit, ref) = line.strip().split()
+except:
+	print "You can push only 1 branch with name %s\n" % gbranch
+	exit(-1)
 if ref != 'refs/heads/'+gbranch:
 	print "You are allowed to push only to %s" % gbranch
 	exit(-1)
