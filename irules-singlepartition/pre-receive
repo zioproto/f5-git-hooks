@@ -65,5 +65,7 @@ if (newrules):
 if (deleterules):
 	b.LocalLB.Rule.delete_rule(deleterules)
 
+# You need to be in '/Common' partition to trigger a sync
+b.System.Session.set_active_folder('/Common')
 b.System.ConfigSync.synchronize_to_group("sync-failover")
 
