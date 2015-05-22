@@ -20,7 +20,8 @@ and the changes are pushed to the BIGIP devices.
 
 This code assumes the following
 
-A git repository manages files only for 1 partition
+A git "bare" repository manages files only for 1 partition
+On DevPC you can have different branches for different F5 partitions
 A git repository manages either irules or datagroups
 All files are in the main folder without subfolders.
 
@@ -33,5 +34,20 @@ You probably have some irules already running on your BIGIP,
 you can backup them to files using the backup-tool.  Once you have the files
 you can create a new git repository and commit the first version of your irules
 files.
+
+ == iRules git branch per F5 Single Partition ==
+
+Create the git bare repository:
+
+cd /opt/irules-git/
+git init --bare --shared=group mypartitionname
+chgrp -Rv mygroupname mypartitionname
+cd mypartitionname/hooks
+wget https://raw.githubusercontent.com/zioproto/f5-git-hooks/master/irules-singlepartition/pre-receive
+chmod +x pre-receive
+vim pre-receive #change user password ip address and gbranch name (that is name of gitbranch and partition)
+
+on your laptop:
+git remote add myremote ssh://user@ipaddress:/opt/irules-git/mypartitionname
 
 
