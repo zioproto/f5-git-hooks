@@ -21,8 +21,12 @@ def git(args, **kwargs):
     return proc.communicate()
 
 def get_changed_files(base, commit, **kw):
-    (results, code) = git(('git', 'diff', '--numstat', '--name-only', "%s..%s" % (base, commit)), **kw)
-    return results.strip().split('\n')
+    if base == "0000000000000000000000000000000000000000":
+        (results, code) = git(('git', 'ls-tree', '--name-only', "%s" % (commit)), **kw)
+        return results.strip().split('\n')
+    else:
+        (results, code) = git(('git', 'diff', '--numstat', '--name-only', "%s..%s" % (base, commit)), **kw)
+        return results.strip().split('\n')
 
 def get_file_content(filename, commit):
     (results, code) = git(('git', 'show', '%s:%s' % (commit, filename)))
